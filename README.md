@@ -2,14 +2,6 @@
 
 This repository contains a static snapshot clone of `http://www.dasoftn.in` generated from the site's WordPress sitemap.
 
-## Important repository note
-
-Some PR platforms reject binary files in diffs. To keep PRs compatible, this repository stores a **text-only snapshot** (HTML/CSS/JS/SVG) and excludes binary assets (fonts/images).
-
-That means:
-- Pages and navigation work.
-- Some typography and thumbnails may not render exactly like the source site.
-
 ## Feasibility
 
 ### Can this be hosted free on Vercel long-term?
