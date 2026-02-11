@@ -6,7 +6,11 @@
  */
 
 ( function( $ ) {
-	var body, masthead, menuToggle, siteNavigation, socialNavigation, siteHeaderMenu, resizeTimer;
+	var body, masthead, menuToggle, siteNavigation, socialNavigation, siteHeaderMenu, resizeTimer,
+		srText = window.screenReaderText || {
+			expand: 'Expand child menu',
+			collapse: 'Collapse child menu'
+		};
 
 	function initMainNavigation( container ) {
 
@@ -16,7 +20,7 @@
 			'aria-expanded': false
 		} ).append( $( '<span />', {
 			'class': 'screen-reader-text',
-			text: screenReaderText.expand
+			text: srText.expand
 		} ) );
 
 		container.find( '.menu-item-has-children > a' ).after( dropdownToggle );
@@ -39,7 +43,7 @@
 			// jscs:disable
 			_this.attr( 'aria-expanded', _this.attr( 'aria-expanded' ) === 'false' ? 'true' : 'false' );
 			// jscs:enable
-			screenReaderSpan.text( screenReaderSpan.text() === screenReaderText.expand ? screenReaderText.collapse : screenReaderText.expand );
+			screenReaderSpan.text( screenReaderSpan.text() === srText.expand ? srText.collapse : srText.expand );
 		} );
 	}
 	initMainNavigation( $( '.main-navigation' ) );
@@ -209,5 +213,79 @@
 		belowEntryMetaClass( 'img.size-full' );
 		belowEntryMetaClass( 'blockquote.alignleft, blockquote.alignright' );
 		belowEntryMetaClass( '.wp-block-image img' );
+
+		function getSearchPageUrl( formAction ) {
+			var homeUrl = new URL( formAction || 'index.html', window.location.href );
+			return new URL( 'search/index.html', homeUrl );
+		}
+
+		$( '.search-form' ).on( 'submit.twentysixteen-search', function( event ) {
+			var query = $( this ).find( '[name="s"]' ).val();
+			var trimmedQuery = query ? query.trim() : '';
+
+			event.preventDefault();
+
+			if ( ! trimmedQuery ) {
+				return;
+			}
+
+			window.location.href = getSearchPageUrl( this.getAttribute( 'action' ) ) + '?s=' + encodeURIComponent( trimmedQuery );
+		} );
+
+		if ( window.location.pathname.match( /\/search\/index\.html$/ ) ) {
+			var searchParams = new URLSearchParams( window.location.search );
+			var searchTerm = ( searchParams.get( 's' ) || '' ).trim();
+			var resultsList = $( '#search-results' );
+			var status = $( '#search-status' );
+			var queryField = $( '#search-query' );
+			var siteRootUrl = new URL( '../', window.location.href );
+
+			if ( queryField.length ) {
+				queryField.val( searchTerm );
+			}
+
+			if ( ! searchTerm ) {
+				status.text( 'Type a search term to find matching pages.' );
+				return;
+			}
+
+			fetch( new URL( 'search-index.json', siteRootUrl ) )
+				.then( function( response ) {
+					if ( ! response.ok ) {
+						throw new Error( 'Failed to load search index' );
+					}
+					return response.json();
+				} )
+				.then( function( pages ) {
+					var lowerTerm = searchTerm.toLowerCase();
+					var matches = pages.filter( function( page ) {
+						return page.title.toLowerCase().indexOf( lowerTerm ) !== -1;
+					} );
+
+					status.text( matches.length + ' result' + ( matches.length === 1 ? '' : 's' ) + ' for "' + searchTerm + '".' );
+
+					resultsList.empty();
+
+					matches.forEach( function( page ) {
+						var item = $( '<li />' );
+						var link = $( '<a />', {
+							href: new URL( page.url, siteRootUrl ).toString(),
+							text: page.title
+						} );
+
+						item.append( link );
+						resultsList.append( item );
+					} );
+
+					if ( ! matches.length ) {
+						resultsList.append( $( '<li />', {
+							text: 'No pages matched your search.'
+						} ) );
+					}
+				} )
+				.catch( function() {
+					status.text( 'Search is temporarily unavailable. Please try again.' );
+				} );
+		}
 	} );
 } )( jQuery );
