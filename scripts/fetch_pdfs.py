@@ -7,10 +7,17 @@ import os
 import re
 import sys
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
 PDF_URL_RE = re.compile(r"https?://www\.dasoftn\.in/wp-content/uploads/[^\"'\s<>]+?\.pdf", re.IGNORECASE)
+
+
+def request_url(pdf_url: str) -> str:
+    parsed = urlparse(pdf_url)
+    safe_path = quote(unquote(parsed.path), safe='/%._-()[]')
+    safe_query = quote(unquote(parsed.query), safe='=&%._-')
+    return parsed._replace(path=safe_path, query=safe_query).geturl()
 
 
 def normalized_upload_path(pdf_url: str) -> Path:
@@ -23,7 +30,7 @@ def normalized_upload_path(pdf_url: str) -> Path:
 
 def download_pdf(url: str, dest: Path, timeout: int) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    req = Request(url, headers={"User-Agent": "Mozilla/5.0 (pdf-mirror-bot)"})
+    req = Request(request_url(url), headers={"User-Agent": "Mozilla/5.0 (pdf-mirror-bot)"})
     with urlopen(req, timeout=timeout) as response:
         data = response.read()
     dest.write_bytes(data)
@@ -34,6 +41,7 @@ def main() -> int:
     parser.add_argument("--root", default="cloned-site/www.dasoftn.in", help="Path to mirrored site root")
     parser.add_argument("--timeout", type=int, default=45, help="Download timeout seconds per file")
     parser.add_argument("--limit", type=int, default=0, help="Optional cap for number of PDFs to download (0 = all)")
+    parser.add_argument("--fail-on-errors", action="store_true", help="Exit non-zero if any PDF download fails")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -95,7 +103,8 @@ def main() -> int:
     print(f"Rewrote links in {rewritten_files} HTML files")
     if failed:
         print(f"Failed to fetch {len(failed)} PDFs", file=sys.stderr)
-        return 2
+        if args.fail_on_errors:
+            return 2
     return 0
 
 
